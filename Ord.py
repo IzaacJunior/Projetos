@@ -1,6 +1,7 @@
 import os
 import unidecode as uni
 from tkinter import *
+from pathlib import Path as Ph
 
 
 class Interface:
@@ -102,14 +103,22 @@ class Interface:
                        self.inicio, self.etiqueta4)
 
     def adicionar(self):
+        var = ''
+        for folder in os.environ["APPDATA"]:
+            if folder in r'\/':
+                break
+            var += folder
+        rota = f'{var}{os.environ["HOMEPATH"]}'
+        if os.path.isdir(f'{rota}/{self.caixa1.get().strip()}') and self.caixa1.get().strip() != '':
+            var2 = self.caixa1.get().strip()
+            self.caixa1.delete(0, 'end')
+            self.caixa1.insert(0, fr'{rota}\{var2}')
         self.etiqueta4['text'] = '---'
         documentos = self.caixa2.get().split(', ')
         arquivo = self.caixa3.get()
         for doc in documentos:
-            print(self.checkbox1.get())
             if doc != '' and arquivo != '':
                 self.normal2()
-
                 if self.checkbox1.get() == 1:
                     pasta.adicionar(doc, arquivo, self.caixa1.get().strip())
                 else:
@@ -130,49 +139,47 @@ class Interface:
 
 class Pasta:
     def __init__(self):
-        self.local_keys = os.environ['HOMEPATH'] + '/.Ordem'
+        self.local_keys = Ph(os.environ['HOMEPATH'] + '/.Ordem')
         self.keys = '_Keyes.txt'
         self.verificar()
 
     def verificar(self) -> None:
-        if not os.path.isdir(self.local_keys):
-            os.mkdir(self.local_keys)
-        for arquivo in self.keys:
-            if not os.path.isfile(fr'{self.local_keys}/{arquivo}'):
-                self.limpar_criar()
+        if not Ph(self.local_keys).is_dir():
+            Ph(self.local_keys).mkdir()
+        if not Ph(self.local_keys/self.keys).is_file():
+            self.limpar_criar()
 
-    def limpar_criar(self, local=None) -> bool:
+    def limpar_criar(self, local=None) -> None:
         if local is not None:
-            if local != '' and os.path.isdir(local):
-                local_keys = fr'{local}'
+            if local != '' and Ph(local).is_dir():
+                local_keys = {local}
             else:
-                return False
+                return
         else:
             local_keys = self.local_keys
-        with open(f'{local_keys}/{self.keys}', '+w') as txt:
+        with open(f'{Ph(local_keys)/self.keys}', '+w') as txt:
             txt.write('')
 
-    def adicionar(self, novas_keys: str, novas_values: str, local=None) -> bool:
+    def adicionar(self, novas_keys: str, novas_values: str, local=None) -> None:
         if local is not None:
-            if local != '' and os.path.isdir(local):
-                local_keys = fr'{local}'
+            if local != '' and Ph(local).is_dir():
+                local_keys = local
             else:
-                return False
+                return
         else:
             local_keys = self.local_keys
-
-        with open(f'{local_keys}/{self.keys}', 'a', encoding='utf-8') as txt:
+        with open(f'{Ph(local_keys)/self.keys}', 'a', encoding='utf-8') as txt:
             txt.write(fr'{novas_keys} {novas_values} ')
 
-    def ler(self, local=None) -> bool | dict[str, str]:
+    def ler(self, local=None) -> None | dict[str, str]:
         if local is not None:
-            if local != '' and os.path.isdir(local):
-                local_keys = fr'{local}'
+            if local != '' and Ph(local).is_dir():
+                local_keys = local
             else:
-                return False
+                return
         else:
             local_keys = self.local_keys
-        with open(f'{local_keys}/{self.keys}', 'rt', encoding='utf-8') as txt:
+        with open(f'{Ph(local_keys)/self.keys}', 'rt', encoding='utf-8') as txt:
             lista_keys = txt.readline().split()
         keys_values = {}
         for palavra in range(1, len(lista_keys), 2):
@@ -196,7 +203,7 @@ class Sistema:
             else:
                 pasta.limpar_criar()
             caminho.delete(0, 'end')
-        elif os.path.isdir(caminho.get().strip()):
+        elif Ph(caminho.get().strip()).is_dir() and caminho.get().strip() != '':
             etiqueta4['text'] = '...'
             etiqueta4['fg'] = 'WHITE'
             normal()
@@ -210,7 +217,7 @@ class Sistema:
                     break
                 var += folder
             rota = f'{var}{os.environ["HOMEPATH"]}'
-            if os.path.isdir(f'{rota}/{caminho.get().strip()}') and caminho.get().strip() != '':
+            if Ph(f'{rota}/{caminho.get().strip()}').is_dir() and caminho.get().strip() != '':
                 var2 = caminho.get().strip()
                 caminho.delete(0, 'end')
                 caminho.insert(0, fr'{rota}\{var2}')
@@ -221,21 +228,21 @@ class Sistema:
 
     def documentos(self, caminho, checkbox1, checkbox2, erro) -> None:
         if checkbox1 == 1:
-            if caminho.get() != '' and os.path.isdir(caminho.get()):
+            if caminho.get() != '' and Ph(caminho.get()).is_dir():
                 keys_values = pasta.ler(caminho.get().strip())
             else:
                 erro()
-                return None
+                return
         else:
             keys_values = pasta.ler()
-        self.documento = os.listdir(caminho.get().strip())
-        self.caminho = caminho.get().strip()
+        self.documento = Ph(caminho.get().strip()).iterdir()
+        self.caminho = Ph(caminho.get().strip())
         for self.folder in self.documento:
-            self.documento = os.listdir(caminho.get().strip())
+            self.documento = Ph(caminho.get().strip()).iterdir()
             caracter = None
-            if '.' in self.folder:
+            if Ph(self.folder).is_file():
                 for folder2 in keys_values:
-                    if uni.unidecode(folder2) in uni.unidecode(self.folder):
+                    if uni.unidecode(folder2) in uni.unidecode(self.folder.name):
                         caracter = keys_values[folder2]
                 if caracter is not None:
                     self.favoritos(caracter)
@@ -244,55 +251,46 @@ class Sistema:
 
     def favoritos(self, caracter):
         for arquivo in self.documento:
-            if '.' not in arquivo:
-                if uni.unidecode(caracter.lower()) in uni.unidecode(arquivo.lower()):
+            if arquivo.is_dir():
+                if uni.unidecode(caracter.lower()) in uni.unidecode(arquivo.name.lower()):
                     self.move(arquivo)
-                    return True
+                    return
         self.criar(caracter)
 
-    def modelo(self) -> str:
-        arquivo = ''
-        numero_tras = len(self.folder) - 1
-        while '.' not in arquivo:
-            arquivo += self.folder[numero_tras]
-            numero_tras -= 1
-        arquivo = arquivo[-2::-1].lower()
-        return arquivo.lower()
-
     def formato(self):
-        arquivo = self.modelo()
+        arquivo = self.folder.suffix[1:].lower()
         for folder2 in self.documento:
-            if '.' not in folder2 and arquivo in folder2.lower():
+            if Ph(folder2).is_dir() and arquivo in folder2.name.lower():
                 self.move(arquivo)
-                return True
+                return
         self.criar(arquivo)
 
     def criar(self, arquivo):
-        os.mkdir(f'{self.caminho}/{arquivo}')
+        Ph(self.caminho/arquivo).mkdir()
         self.move(arquivo)
 
     def move(self, arquivo):
         for numero in range(0, 9):
-            if f' ({numero}).' in self.folder:
+            if f' ({numero}).' in self.folder.name:
                 re = 4
                 self.repetidos(arquivo, re)
-                return True
+                return
         re = 0
-        if self.folder != '_Keyes.txt':
-            if not os.path.isfile(f'{self.caminho}/{arquivo}/{self.folder}'):
-                os.rename(f'{self.caminho}/{self.folder}', f'{self.caminho}/{arquivo}/{self.folder}')
+        if self.folder.name != '_Keyes.txt':
+            if not Ph(self.caminho/arquivo/self.folder.name).is_file():
+                os.rename(f'{Ph(self.caminho/self.folder.name)}', f'{Ph(self.caminho/arquivo/self.folder.name)}')
             else:
+
                 self.repetidos(arquivo, re)
 
     def repetidos(self, arquivo, re):
         n = 1
-        nome = len(self.modelo()) + 1
-        if not os.path.isdir(f'{self.caminho}/{arquivo}/Repitidos'):
-            os.makedirs(f'{self.caminho}/{arquivo}/Repitidos')
+        if not Ph(self.caminho/arquivo/'Repitidos').is_dir():
+            Ph(self.caminho/arquivo/'Repitidos').mkdir(parents=True)
         while True:
-            folder = f'{self.folder[:-nome - re]} ({n}){self.folder[-nome:]}'
-            if not os.path.isfile(f'{self.caminho}/{arquivo}/Repitidos/{folder}'):
-                os.rename(f"{self.caminho}/{self.folder}", f'{self.caminho}/{arquivo}/Repitidos/{folder}')
+            folder = f'{self.folder.stem[:-re]} ({n}){self.folder.suffix}'
+            if not Ph(self.caminho/arquivo/'Repitidos'/folder).is_file():
+                os.rename(f"{Ph(self.caminho/self.folder)}", f'{Ph(self.caminho/arquivo/"Repitidos"/folder)}')
                 break
             else:
                 n += 1
